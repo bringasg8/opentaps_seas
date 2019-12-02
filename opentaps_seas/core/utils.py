@@ -1143,7 +1143,7 @@ def get_weather_history_for_station(weather_station, days_from_today=7):
     start_date = end_date - timedelta(hours=days_from_today*24)
 
     # Get last update datetime
-    last_record = WeatherStation.objects.filter(weather_station=weather_station).order_by('-as_of_datetime').first()
+    last_record = WeatherHistory.objects.filter(weather_station=weather_station).order_by('-as_of_datetime').first()
     if last_record:
         start_date = last_record.as_of_datetime + timedelta(minutes=1)
 

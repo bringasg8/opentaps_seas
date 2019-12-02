@@ -2993,7 +2993,7 @@ class MeterCreateView(LoginRequiredMixin, WithBreadcrumbsMixin, CreateView):
                 initial_values['weather_station'] = utils.get_default_weather_station_for_site(site)
 
                 form_data['initial'] = initial_values
-        except:
+        except Entity.DoesNotExist:
             pass
 
         return form_data

@@ -43,6 +43,8 @@ from django.utils.html import format_html
 from django.conf import settings
 from django.utils.crypto import get_random_string
 from django.utils.text import slugify
+from eeweather.exceptions import ISDDataNotAvailableError
+from eeweather.exceptions import UnrecognizedUSAFIDError
 
 logger = logging.getLogger(__name__)
 
@@ -1115,14 +1117,12 @@ def link_points_to_equipments(new_equipments, new_equipments_topics):
 def get_weather_station_for_location(latitude, longitude, as_object=True):
     ranked_stations = eeweather.rank_stations(latitude, longitude)
     for i in range(len(ranked_stations)):
-        try:
-            ranked_station = ranked_stations.iloc[i]
-            if as_object:
-                return WeatherStation.objects.get(weather_station_code=ranked_station.name)
-            else:
-                return ranked_station.name
-        except:
-            pass
+        ranked_station = ranked_stations.iloc[i]
+        station = WeatherStation.objects.filter(weather_station_code=ranked_station.name).first()
+        if not station:
+            continue
+
+        return station if as_object else station.name
 
 def get_default_weather_station_for_site(site):
     if not site:
@@ -1143,19 +1143,16 @@ def get_weather_history_for_station(weather_station, days_from_today=7):
     start_date = end_date - timedelta(hours=days_from_today*24)
 
     # Get last update datetime
-    try:
-        last_record = WeatherStation.objects.filter(weather_station=weather_station).order_by('-as_of_datetime').first()
-        if last_record:
-            start_date = last_record.as_of_datetime + timedelta(minutes=1)
-    except:
-        pass
+    last_record = WeatherStation.objects.filter(weather_station=weather_station).order_by('-as_of_datetime').first()
+    if last_record:
+        start_date = last_record.as_of_datetime + timedelta(minutes=1)
 
     # Get weather station
     station = None
     try:
         station = eeweather.ISDStation(weather_station.weather_station_code)
-    except Exception as e:
-        print(e.message)
+    except UnrecognizedUSAFIDError:
+        logger.warning('Cannot get weather station for USAF ID ' + weather_station.weather_station_code)
         return
 
     try:
@@ -1172,5 +1169,5 @@ def get_weather_history_for_station(weather_station, days_from_today=7):
             new_data.save()
 
         return temp_degC
-    except Exception as e:
-        print(e)
+    except ISDDataNotAvailableError:
+        logger.exception('Could not retrieve ISD history data')
